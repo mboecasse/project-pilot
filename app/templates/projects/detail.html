@@ -1,0 +1,482 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ project.name }} - ProjectPilot{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb navigation -->
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('projects.index') }}">Projects</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ project.name }}</li>
+    </ol>
+</nav>
+
+<!-- Project header -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="mb-1">{{ project.name }}</h1>
+                <div class="mb-3">
+                    <span class="badge bg-secondary me-2">{{ project.type|capitalize }}</span>
+                    <span class="badge {% if project.status == 'planning' %}bg-info{% elif project.status == 'active' %}bg-primary{% elif project.status == 'completed' %}bg-success{% else %}bg-secondary{% endif %} me-2">
+                        {{ project.status|capitalize }}
+                    </span>
+                    <span class="text-muted small">
+                        <i class="fas fa-calendar-alt me-1"></i> Created {{ project.created_at.strftime('%Y-%m-%d') }}
+                    </span>
+                </div>
+            </div>
+            <div class="btn-group">
+                <a href="{{ url_for('projects.edit', project_id=project.id) }}" class="btn btn-outline-primary">
+                    <i class="fas fa-edit me-1"></i> Edit
+                </a>
+                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteProjectModal">
+                    <i class="fas fa-trash-alt me-1"></i> Delete
+                </button>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-8">
+                <p>{{ project.description }}</p>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body p-3">
+                        <h5 class="card-title">Progress</h5>
+                        <div class="progress mb-3" style="height: 20px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: {{ project.progress }}%;" aria-valuenow="{{ project.progress }}" aria-valuemin="0" aria-valuemax="100">{{ project.progress }}%</div>
+                        </div>
+                        <div class="row text-center">
+                            <div class="col">
+                                <div class="h5 mb-0">{{ project.tasks.count() }}</div>
+                                <div class="small text-muted">Tasks</div>
+                            </div>
+                            <div class="col">
+                                <div class="h5 mb-0">{{ worker_bots|length }}</div>
+                                <div class="small text-muted">Bots</div>
+                            </div>
+                            <div class="col">
+                                <div class="h5 mb-0">{{ project.updated_at.strftime('%Y-%m-%d') }}</div>
+                                <div class="small text-muted">Last Update</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs navigation -->
+<ul class="nav nav-tabs mb-4" id="projectTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tasks-tab" data-bs-toggle="tab" data-bs-target="#tasks" type="button" role="tab" aria-controls="tasks" aria-selected="true">
+            <i class="fas fa-tasks me-1"></i> Tasks
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="worker-bots-tab" data-bs-toggle="tab" data-bs-target="#worker-bots" type="button" role="tab" aria-controls="worker-bots" aria-selected="false">
+            <i class="fas fa-robot me-1"></i> Worker Bots
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="analytics-tab" data-bs-toggle="tab" data-bs-target="#analytics" type="button" role="tab" aria-controls="analytics" aria-selected="false">
+            <i class="fas fa-chart-bar me-1"></i> Analytics
+        </button>
+    </li>
+</ul>
+
+<!-- Tab contents -->
+<div class="tab-content" id="projectTabContent">
+    <!-- Tasks tab -->
+    <div class="tab-pane fade show active" id="tasks" role="tabpanel" aria-labelledby="tasks-tab">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="mb-0"><i class="fas fa-tasks me-2"></i>Tasks</h3>
+            <a href="{{ url_for('tasks.new_task', project_id=project.id) }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> New Task
+            </a>
+        </div>
+        
+        {% if tasks %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">Name</th>
+                        <th scope="col">Type</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Priority</th>
+                        <th scope="col">Assigned To</th>
+                        <th scope="col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('tasks.detail', task_id=task.id) }}" class="text-decoration-none">{{ task.name }}</a>
+                            {% if task.description %}
+                            <div class="small text-muted">{{ task.description|truncate(50) }}</div>
+                            {% endif %}
+                        </td>
+                        <td><span class="badge bg-secondary">{{ task.type|capitalize }}</span></td>
+                        <td>
+                            <span class="badge 
+                                {% if task.status == 'pending' %}bg-warning
+                                {% elif task.status == 'in_progress' %}bg-info
+                                {% elif task.status == 'review' %}bg-primary
+                                {% elif task.status == 'completed' %}bg-success
+                                {% elif task.status == 'blocked' %}bg-danger
+                                {% else %}bg-secondary{% endif %}">
+                                {{ task.status|replace('_', ' ')|capitalize }}
+                            </span>
+                        </td>
+                        <td>
+                            {% set priority_icon = {
+                                1: 'low',
+                                2: 'medium',
+                                3: 'high',
+                                4: 'critical'
+                            } %}
+                            {% set priority_color = {
+                                1: 'text-success',
+                                2: 'text-info',
+                                3: 'text-warning',
+                                4: 'text-danger'
+                            } %}
+                            <span class="{{ priority_color[task.priority] }}">
+                                {% for i in range(task.priority) %}★{% endfor %}
+                            </span>
+                        </td>
+                        <td>
+                            {% if task.assigned_bot %}
+                            <span class="text-primary"><i class="fas fa-robot me-1"></i>{{ task.assigned_bot.name }}</span>
+                            {% else %}
+                            <span class="text-muted">Unassigned</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('tasks.detail', task_id=task.id) }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{{ url_for('tasks.edit', task_id=task.id) }}" class="btn btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="card shadow-sm">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-clipboard-list fa-4x mb-3 text-muted"></i>
+                <h4>No Tasks Found</h4>
+                <p class="text-muted">This project doesn't have any tasks yet.</p>
+                <a href="{{ url_for('tasks.new_task', project_id=project.id) }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i> Create Your First Task
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Worker Bots tab -->
+    <div class="tab-pane fade" id="worker-bots" role="tabpanel" aria-labelledby="worker-bots-tab">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="mb-0"><i class="fas fa-robot me-2"></i>Worker Bots</h3>
+            <a href="{{ url_for('projects.spawn_bot', project_id=project.id) }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Spawn Bot
+            </a>
+        </div>
+        
+        {% if worker_bots %}
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            {% for bot in worker_bots %}
+            <div class="col">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-robot me-2"></i>{{ bot.name }}</h5>
+                        <span class="badge {% if bot.status == 'working' %}bg-primary{% elif bot.status == 'idle' %}bg-success{% elif bot.status == 'error' %}bg-danger{% else %}bg-secondary{% endif %}">
+                            {{ bot.status|capitalize }}
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-2"><strong>Type:</strong> {{ bot.type|capitalize }}</p>
+                        <p class="mb-2"><strong>Provider:</strong> {{ bot.ai_provider|upper }}</p>
+                        <p class="mb-2"><strong>Model:</strong> {{ bot.ai_model }}</p>
+                        
+                        <div class="mt-3">
+                            <h6>Capabilities:</h6>
+                            <div>
+                                {% for capability in bot.capabilities %}
+                                <span class="badge bg-light text-dark me-1 mb-1">{{ capability|replace('_', ' ')|capitalize }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        {% if bot.assigned_tasks.count() > 0 %}
+                        <div class="mt-3">
+                            <h6>Current Task:</h6>
+                            {% set current_task = bot.assigned_tasks.filter_by(status='in_progress').first() %}
+                            {% if current_task %}
+                            <a href="{{ url_for('tasks.detail', task_id=current_task.id) }}" class="text-decoration-none">
+                                {{ current_task.name }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">No active task</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="card-footer d-flex justify-content-between">
+                        <small class="text-muted">Created: {{ bot.created_at.strftime('%Y-%m-%d') }}</small>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteBotModal{{ bot.id }}">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Delete Bot Modal -->
+            <div class="modal fade" id="deleteBotModal{{ bot.id }}" tabindex="-1" aria-labelledby="deleteBotModal{{ bot.id }}Label" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="deleteBotModal{{ bot.id }}Label">Delete Worker Bot</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Are you sure you want to delete the worker bot <strong>{{ bot.name }}</strong>?</p>
+                            <p class="text-danger">This action cannot be undone.</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <form action="{{ url_for('api.delete_worker_bot', bot_id=bot.id) }}" method="POST">
+                                <button type="submit" class="btn btn-danger">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card shadow-sm">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-robot fa-4x mb-3 text-muted"></i>
+                <h4>No Worker Bots</h4>
+                <p class="text-muted">You haven't spawned any worker bots for this project yet.</p>
+                <a href="{{ url_for('projects.spawn_bot', project_id=project.id) }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i> Spawn Your First Bot
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Analytics tab -->
+    <div class="tab-pane fade" id="analytics" role="tabpanel" aria-labelledby="analytics-tab">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h3 class="mb-4"><i class="fas fa-chart-bar me-2"></i>Project Analytics</h3>
+                
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h5>Task Status Distribution</h5>
+                        <div class="chart-container" style="position: relative; height:200px; width:100%">
+                            <canvas id="taskStatusChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Progress Over Time</h5>
+                        <div class="chart-container" style="position: relative; height:200px; width:100%">
+                            <canvas id="progressChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Task Priority Breakdown</h5>
+                        <div class="chart-container" style="position: relative; height:200px; width:100%">
+                            <canvas id="priorityChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Bot Activity</h5>
+                        <div class="chart-container" style="position: relative; height:200px; width:100%">
+                            <canvas id="botActivityChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <p class="text-muted">Analytics data is refreshed every 24 hours.</p>
+                    <button class="btn btn-outline-primary">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh Analytics
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Project Modal -->
+<div class="modal fade" id="deleteProjectModal" tabindex="-1" aria-labelledby="deleteProjectModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteProjectModalLabel">Delete Project</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the project <strong>{{ project.name }}</strong>?</p>
+                <p class="text-danger">This will delete all tasks and worker bots associated with this project. This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="{{ url_for('projects.delete', project_id=project.id) }}" method="POST">
+                    <button type="submit" class="btn btn-danger">Delete Project</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Sample data for charts
+    document.addEventListener('DOMContentLoaded', function() {
+        // Task status chart
+        const taskStatusCtx = document.getElementById('taskStatusChart').getContext('2d');
+        const taskStatusChart = new Chart(taskStatusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Pending', 'In Progress', 'Review', 'Completed', 'Blocked'],
+                datasets: [{
+                    data: [
+                        {{ tasks|selectattr('status', 'eq', 'pending')|list|length }},
+                        {{ tasks|selectattr('status', 'eq', 'in_progress')|list|length }},
+                        {{ tasks|selectattr('status', 'eq', 'review')|list|length }},
+                        {{ tasks|selectattr('status', 'eq', 'completed')|list|length }},
+                        {{ tasks|selectattr('status', 'eq', 'blocked')|list|length }}
+                    ],
+                    backgroundColor: [
+                        '#ffc107', // warning
+                        '#17a2b8', // info
+                        '#007bff', // primary
+                        '#28a745', // success
+                        '#dc3545'  // danger
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+        
+        // Progress chart (mock data)
+        const progressCtx = document.getElementById('progressChart').getContext('2d');
+        const progressChart = new Chart(progressCtx, {
+            type: 'line',
+            data: {
+                labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Current'],
+                datasets: [{
+                    label: 'Progress',
+                    data: [10, 25, 40, 60, {{ project.progress }}],
+                    borderColor: '#007bff',
+                    tension: 0.1,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+        
+        // Priority chart
+        const priorityCtx = document.getElementById('priorityChart').getContext('2d');
+        const priorityChart = new Chart(priorityCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Low', 'Medium', 'High', 'Critical'],
+                datasets: [{
+                    label: 'Tasks',
+                    data: [
+                        {{ tasks|selectattr('priority', 'eq', 1)|list|length }},
+                        {{ tasks|selectattr('priority', 'eq', 2)|list|length }},
+                        {{ tasks|selectattr('priority', 'eq', 3)|list|length }},
+                        {{ tasks|selectattr('priority', 'eq', 4)|list|length }}
+                    ],
+                    backgroundColor: [
+                        '#28a745', // success
+                        '#17a2b8', // info
+                        '#ffc107', // warning
+                        '#dc3545'  // danger
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+        
+        // Bot activity chart (mock data)
+        const botActivityCtx = document.getElementById('botActivityChart').getContext('2d');
+        const botActivityChart = new Chart(botActivityCtx, {
+            type: 'bar',
+            data: {
+                labels: [
+                    {% for bot in worker_bots %}
+                    '{{ bot.name }}',
+                    {% endfor %}
+                ],
+                datasets: [{
+                    label: 'Tasks Completed',
+                    data: [
+                        {% for bot in worker_bots %}
+                        {{ bot.assigned_tasks.filter_by(status='completed').count() }},
+                        {% endfor %}
+                    ],
+                    backgroundColor: '#007bff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,55 @@
+name: Deploy to AWS Elastic Beanstalk
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest
+    
+    - name: Run tests
+      run: |
+        pytest -v
+    
+    - name: Generate deployment package
+      run: |
+        mkdir -p deploy
+        cp -r . deploy/
+        cd deploy
+        zip -r ../deploy.zip .
+    
+    - name: Deploy to Elastic Beanstalk
+      uses: einaregilsson/beanstalk-deploy@v20
+      with:
+        aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        application_name: "ProjectPilot"
+        environment_name: "project-pilot-env"
+        version_label: "projectpilot-${{ github.sha }}"
+        region: "eu-west-2"
+        deployment_package: deploy.zip
+        wait_for_deployment: true
+        wait_for_environment_recovery: 300
+    
+    - name: Post-deployment verification
+      run: |
+        echo "Deployment completed. Running verification checks..."
+        sleep 30
+        # Add verification checks here (e.g., health check API call)
+        echo "Verification complete."

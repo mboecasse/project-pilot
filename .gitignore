@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.db
+.env
+logs/
+instance/
+.DS_Store
+.idea/
+.pytest_cache/
+migrations/versions/
