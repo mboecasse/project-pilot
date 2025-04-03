@@ -78,12 +78,14 @@ def register_blueprints(app):
     from app.routes.projects import projects_bp
     from app.routes.tasks import tasks_bp
     from app.routes.api import api_bp
+    from app.routes.dashboard import dashboard_bp
     
     # Register blueprints
     app.register_blueprint(auth_bp)
     app.register_blueprint(projects_bp)
     app.register_blueprint(tasks_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(dashboard_bp)
 
 def register_error_handlers(app):
     """Register error handlers"""
