@@ -1,63 +1,57 @@
 #!/bin/bash
 
-# ⚠️ IMPORTANT: PLATFORM UPGRADE REQUIRED ⚠️
-# The current platform "Python 3.8 running on 64bit Amazon Linux 2/3.8.0" is DEPRECATED
-# This script provides instructions for upgrading to a supported platform
+# Elastic Beanstalk Platform Upgrade Script
 
-# Instructions for upgrading Elastic Beanstalk platform
+# Ensure you're in the project root directory
+echo "📋 Preparing for Elastic Beanstalk Platform Upgrade..."
 
-# Option 1: AWS Console Method
-# 1. Go to the Elastic Beanstalk console
-# 2. Select your environment (project-pilot-env-3)
-# 3. Click "Change version" button in the Platform section
-# 4. Select the latest Python platform version
-# 5. Click "Apply"
+# Verify EB CLI is installed
+if ! command -v eb &> /dev/null; then
+    echo "❌ ERROR: EB CLI is not installed."
+    echo "Install it using: pip install awsebcli"
+    exit 1
+fi
 
-# Option 2: AWS CLI Method
-# Get latest platform version
-LATEST_PLATFORM=$(aws elasticbeanstalk list-available-solution-stacks --query "SolutionStacks[?contains(@, 'running Python 3.11') && contains(@, 'Amazon Linux 2023')] | [0]" --output text)
+# Check git status (avoid upgrading with uncommitted changes)
+if [[ -n $(git status -s) ]]; then
+    echo "⚠️ WARNING: You have uncommitted changes."
+    git status
+    read -p "Do you want to continue? (y/N) " confirm
+    if [[ $confirm != [yY] && $confirm != [yY][eE][sS] ]]; then
+        echo "Upgrade cancelled."
+        exit 1
+    fi
+fi
 
-echo "Latest available Python platform: $LATEST_PLATFORM"
+# Initialize EB application (if not already done)
+eb init
 
-# Update environment to latest platform
-aws elasticbeanstalk update-environment \
-  --environment-name project-pilot-env-3 \
-  --solution-stack-name "$LATEST_PLATFORM"
+# List current environments
+echo "🔍 Current Elastic Beanstalk Environments:"
+eb list
 
-# Option 3: EB CLI Method (Recommended)
-# Run these commands from your project directory
-eb use project-pilot-env-3
+# Confirm environment name
+read -p "Enter the environment name to upgrade (default: project-pilot-env-3): " ENV_NAME
+ENV_NAME=${ENV_NAME:-project-pilot-env-3}
+
+# Select new platform
+echo "🚀 Selecting new platform version..."
 eb platform select
-# Then select the latest Python platform version
+
+# Deploy to the selected environment
+echo "📦 Deploying to $ENV_NAME..."
+eb use "$ENV_NAME"
 eb deploy
 
-# Update the platform in your configuration
-cat > .ebextensions/00_environment_setup.config << 'EOL'
-option_settings:
-  aws:elasticbeanstalk:container:python:
-    WSGIPath: wsgi:application
-    PythonVersion: 3.11
+# Verify deployment status
+echo "🕵️ Checking environment health..."
+eb health "$ENV_NAME"
 
-  aws:elasticbeanstalk:application:environment:
-    # Python environment variables
-    PYTHONPATH: "/var/app/current:$PYTHONPATH"
-    FLASK_CONFIG: "production"
-    AWS_REGION: "eu-west-2"
-    SECRET_NAME: "manager-bot-secrets"
-    
-    # Rust and Cargo paths
-    PATH: "/root/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-    
-packages:
-  yum:
-    git: []
-    postgresql-devel: []
-    python3-devel: []
-    gcc: []
-    gcc-c++: []
-    make: []
-    openssl-devel: []
-EOL
+# Open environment in browser
+read -p "Do you want to open the environment in a web browser? (y/N) " open_browser
+if [[ $open_browser == [yY] || $open_browser == [yY][eE][sS] ]]; then
+    eb open
+fi
 
-# Update the GitHub workflow to use the new platform
-sed -i 's/project-pilot-env-3/project-pilot-env-3/g' .github/workflows/deploy.yml
+echo "✅ Platform upgrade process completed!"
+echo "IMPORTANT: Verify your application functionality thoroughly after the upgrade."
