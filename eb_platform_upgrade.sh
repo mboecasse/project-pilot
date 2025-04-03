@@ -24,7 +24,8 @@ if [[ -n $(git status -s) ]]; then
 fi
 
 # Initialize EB application (if not already done)
-eb init
+echo "🌐 Setting AWS region to eu-west-2..."
+eb init --region eu-west-2
 
 # List current environments
 echo "🔍 Current Elastic Beanstalk Environments:"
