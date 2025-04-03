@@ -1132,5 +1132,308 @@ class KnowledgeBase:
             logger.error(f"Error calculating similarity: {str(e)}")
             return 0.0
 
+    def similarity_search_with_filter(self, 
+                               query: str,
+                               category: Optional[str] = None,
+                               min_similarity: float = 0.6,
+                               limit: int = 5) -> List[Tuple[KnowledgeEntry, float]]:
+        """
+        Perform semantic search with category filtering and similarity threshold.
+        
+        Args:
+            query: Search query
+            category: Category to filter by
+            min_similarity: Minimum similarity threshold (0-1)
+            limit: Maximum number of results to return
+            
+        Returns:
+            List of tuples (entry, similarity_score)
+        """
+        # Get raw semantic search results
+        results = self.semantic_search(query, limit=limit * 2)  # Get more results for filtering
+        
+        # Filter by category if specified
+        if category:
+            results = [(entry, score) for entry, score in results if entry.category == category]
+        
+        # Filter by minimum similarity
+        results = [(entry, score) for entry, score in results if score >= min_similarity]
+        
+        # Return top results up to limit
+        return results[:limit]
+
+    def get_related_entries(self, entry_id: int, limit: int = 5) -> List[Tuple[KnowledgeEntry, float]]:
+        """
+        Get entries related to a specific entry.
+        
+        Args:
+            entry_id: Entry ID to find related entries for
+            limit: Maximum number of results to return
+            
+        Returns:
+            List of tuples (entry, similarity_score)
+        """
+        # Get the entry
+        entry = self.get_entry(entry_id)
+        if not entry:
+            return []
+        
+        # Create query from entry title and content
+        query = f"{entry.title} {entry.content[:200]}"
+        
+        # Get similar entries
+        results = self.semantic_search(query, limit=limit + 1)
+        
+        # Remove the original entry from results
+        results = [(e, score) for e, score in results if e.entry_id != entry_id]
+        
+        # Return top results up to limit
+        return results[:limit]
+
+    def categorize_entry(self, content: str) -> str:
+        """
+        Automatically categorize content based on existing categories.
+        
+        Args:
+            content: Text content to categorize
+            
+        Returns:
+            Suggested category name
+        """
+        # Get existing categories
+        categories = self.get_categories()
+        
+        if not categories:
+            return "general"
+        
+        # If we have embedding model, use semantic similarity
+        if self._ensure_embedding_model():
+            # Embed the content
+            content_embedding = self._get_embedding(content)
+            
+            # Compute similarity with each category
+            category_scores = {}
+            for category in categories:
+                # Get sample entries for this category
+                sample_entries = self.search(query="", category=category, limit=5)
+                if not sample_entries:
+                    continue
+                
+                # Get average embedding for category samples
+                category_embeddings = []
+                for entry in sample_entries:
+                    entry_text = f"{entry.title} {entry.content}"
+                    entry_embedding = self._get_embedding(entry_text)
+                    category_embeddings.append(entry_embedding)
+                
+                if not category_embeddings:
+                    continue
+                    
+                # Calculate average embedding
+                avg_embedding = [sum(values) / len(values) for values in zip(*category_embeddings)]
+                
+                # Calculate similarity
+                similarity = self._calculate_similarity(content_embedding, avg_embedding)
+                category_scores[category] = similarity
+            
+            # Return category with highest similarity
+            if category_scores:
+                return max(category_scores.items(), key=lambda x: x[1])[0]
+        
+        # Fallback: return most common category
+        return categories[0]
+
+    def extract_tags_from_content(self, content: str) -> List[str]:
+        """
+        Extract relevant tags from content using NLP techniques.
+        
+        Args:
+            content: Text content to extract tags from
+            
+        Returns:
+            List of extracted tags
+        """
+        # Simple keyword extraction for now
+        # In a more advanced implementation, this would use NLP techniques
+        common_tags = self.get_tags()
+        extracted_tags = []
+        
+        # Check for common tags in content
+        for tag in common_tags:
+            if tag.lower() in content.lower():
+                extracted_tags.append(tag)
+        
+        # Limit to top 5 tags
+        return extracted_tags[:5]
+
+    def generate_knowledge_graph(self, root_entry_id: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Generate a knowledge graph of connected entries.
+        
+        Args:
+            root_entry_id: Optional root entry ID to start from
+            
+        Returns:
+            Dictionary with nodes and edges for knowledge graph
+        """
+        nodes = []
+        edges = []
+        processed_ids = set()
+        
+        # Helper function to add entry and its related entries to graph
+        def process_entry(entry_id, depth=0):
+            if entry_id in processed_ids or depth > 2:  # Limit depth
+                return
+                
+            processed_ids.add(entry_id)
+            
+            # Get entry
+            entry = self.get_entry(entry_id)
+            if not entry:
+                return
+                
+            # Add node
+            nodes.append({
+                "id": str(entry.entry_id),
+                "label": entry.title,
+                "category": entry.category,
+                "tags": entry.tags
+            })
+            
+            # Get related entries
+            related = self.get_related_entries(entry_id, limit=5)
+            
+            # Add edges and process related entries
+            for related_entry, similarity in related:
+                if similarity < 0.5:  # Minimum similarity threshold
+                    continue
+                    
+                # Add edge
+                edges.append({
+                    "source": str(entry.entry_id),
+                    "target": str(related_entry.entry_id),
+                    "value": similarity
+                })
+                
+                # Process related entry
+                process_entry(related_entry.entry_id, depth + 1)
+        
+        # Start from root or process all entries
+        if root_entry_id:
+            process_entry(root_entry_id)
+        else:
+            # Get all entries (limit to 100 for performance)
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM knowledge_entries LIMIT 100")
+            entry_ids = [row[0] for row in cursor.fetchall()]
+            conn.close()
+            
+            for entry_id in entry_ids:
+                process_entry(entry_id)
+        
+        return {
+            "nodes": nodes,
+            "edges": edges
+        }
+
+    def export_knowledge_base(self, format: str = 'json') -> str:
+        """
+        Export entire knowledge base to a file format.
+        
+        Args:
+            format: Export format ('json', 'csv', 'markdown')
+            
+        Returns:
+            String with exported content
+        """
+        # Get all entries
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, title, content, category, tags, source, timestamp,
+                   author_id, content_hash, metadata
+            FROM knowledge_entries
+        """)
+        
+        entries = []
+        for row in cursor.fetchall():
+            entry = {
+                'id': row[0],
+                'title': row[1],
+                'content': row[2],
+                'category': row[3],
+                'tags': json.loads(row[4]),
+                'source': row[5],
+                'timestamp': row[6],
+                'author_id': row[7],
+                'content_hash': row[8],
+                'metadata': json.loads(row[9])
+            }
+            entries.append(entry)
+        
+        conn.close()
+        
+        if format == 'json':
+            return json.dumps({
+                "export_date": datetime.utcnow().isoformat(),
+                "entries_count": len(entries),
+                "entries": entries
+            }, indent=2)
+            
+        elif format == 'csv':
+            import csv
+            from io import StringIO
+            
+            output = StringIO()
+            fieldnames = ['id', 'title', 'category', 'tags', 'source', 'timestamp', 'author_id']
+            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            for entry in entries:
+                writer.writerow({
+                    'id': entry['id'],
+                    'title': entry['title'],
+                    'category': entry['category'],
+                    'tags': ','.join(entry['tags']),
+                    'source': entry['source'],
+                    'timestamp': entry['timestamp'],
+                    'author_id': entry['author_id']
+                })
+            
+            return output.getvalue()
+            
+        elif format == 'markdown':
+            md_lines = ["# Knowledge Base Export", f"Generated on: {datetime.utcnow().isoformat()}", ""]
+            
+            # Group by category
+            by_category = {}
+            for entry in entries:
+                category = entry['category']
+                if category not in by_category:
+                    by_category[category] = []
+                by_category[category].append(entry)
+            
+            # Generate markdown
+            for category, category_entries in by_category.items():
+                md_lines.append(f"## {category}")
+                md_lines.append("")
+                
+                for entry in category_entries:
+                    md_lines.append(f"### {entry['title']}")
+                    if entry['tags']:
+                        md_lines.append(f"*Tags: {', '.join(entry['tags'])}*")
+                    md_lines.append("")
+                    md_lines.append(entry['content'])
+                    md_lines.append("")
+                    md_lines.append(f"*Source: {entry['source'] or 'Unknown'} | Created: {entry['timestamp']}*")
+                    md_lines.append("---")
+                    md_lines.append("")
+            
+            return "\n".join(md_lines)
+            
+        else:
+            return f"Unsupported export format: {format}"
+
 # Initialize the global knowledge base
 knowledge_base = KnowledgeBase()
