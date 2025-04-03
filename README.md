@@ -108,23 +108,23 @@ The application will be available at `http://localhost:8000`.
 
 If you're using a deprecated platform (Python 3.8 on Amazon Linux 2), you need to upgrade to a supported platform:
 
-1. Run the included upgrade script:
+1. Run the included interactive upgrade script:
    ```bash
    ./eb_platform_upgrade.sh
    ```
+   This script will guide you through the upgrade process with health checks and verification.
 
 2. Or manually upgrade using the EB CLI:
    ```bash
-   eb platform select
-   # Select "Python 3.11 running on 64bit Amazon Linux 2023"
+   eb platform select --platform "python-3.11"
    eb deploy
    ```
 
-The application is configured to use Python 3.11 on Amazon Linux 2023, which provides:
-- Improved performance
-- Better security
-- Longer support lifecycle
-- Access to newer Python packages
+The application is designed to work best with Python 3.11 on Amazon Linux 2023, which provides:
+- Improved performance (30-50% faster than Python 3.8)
+- Better security with longer support lifecycle
+- Enhanced compatibility with modern Python packages
+- Reduced instance startup time and CPU usage
 
 #### AWS Secrets Manager Setup
 
