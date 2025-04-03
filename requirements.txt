@@ -1,3 +1,4 @@
+# Python 3.13 compatible packages
 Flask==2.3.3
 Flask-Login==0.6.2
 Flask-Migrate==4.0.5

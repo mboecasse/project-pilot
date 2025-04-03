@@ -37,8 +37,8 @@ ENV_NAME=${ENV_NAME:-project-pilot-env-3}
 
 # Select new platform
 echo "🚀 Selecting new platform version..."
-echo "Recommended: Python 3.11 running on 64bit Amazon Linux 2023"
-eb platform select --platform "python-3.11"
+echo "Upgrading to: Python 3.13 running on 64bit Amazon Linux 2023"
+eb platform select --platform "python-3.13" --region eu-west-2
 
 # Deploy to the selected environment
 echo "📦 Deploying to $ENV_NAME..."
