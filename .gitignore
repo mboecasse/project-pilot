@@ -49,7 +49,6 @@ logs/
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
-.ebextensions
 
 # AWS
 secrets-manager-read-policy.json
