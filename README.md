@@ -27,7 +27,7 @@ ProjectPilot is a comprehensive project management system that leverages AI capa
 
 ### Prerequisites
 
-- Python 3.9 or higher
+- Python 3.11 or higher
 - Git
 - AWS account (for production deployment and Bedrock access)
 - API keys for OpenAI and/or Anthropic (optional)
@@ -91,7 +91,7 @@ The application will be available at `http://localhost:8000`.
 
 3. Initialize Elastic Beanstalk:
    ```bash
-   eb init -p python-3.9 ProjectPilot
+   eb init -p python-3.11 ProjectPilot
    ```
 
 4. Create an environment:
@@ -103,6 +103,28 @@ The application will be available at `http://localhost:8000`.
    ```bash
    eb setenv FLASK_CONFIG=production SECRET_NAME=manager-bot-secrets AWS_REGION=eu-west-2
    ```
+
+#### Platform Upgrade (Important)
+
+If you're using a deprecated platform (Python 3.8 on Amazon Linux 2), you need to upgrade to a supported platform:
+
+1. Run the included upgrade script:
+   ```bash
+   ./eb_platform_upgrade.sh
+   ```
+
+2. Or manually upgrade using the EB CLI:
+   ```bash
+   eb platform select
+   # Select "Python 3.11 running on 64bit Amazon Linux 2023"
+   eb deploy
+   ```
+
+The application is configured to use Python 3.11 on Amazon Linux 2023, which provides:
+- Improved performance
+- Better security
+- Longer support lifecycle
+- Access to newer Python packages
 
 #### AWS Secrets Manager Setup
 

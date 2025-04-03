@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# ⚠️ IMPORTANT: PLATFORM UPGRADE REQUIRED ⚠️
+# The current platform "Python 3.8 running on 64bit Amazon Linux 2/3.8.0" is DEPRECATED
+# This script provides instructions for upgrading to a supported platform
+
 # Instructions for upgrading Elastic Beanstalk platform
 
 # Option 1: AWS Console Method
@@ -10,9 +14,15 @@
 # 5. Click "Apply"
 
 # Option 2: AWS CLI Method
+# Get latest platform version
+LATEST_PLATFORM=$(aws elasticbeanstalk list-available-solution-stacks --query "SolutionStacks[?contains(@, 'running Python 3.11') && contains(@, 'Amazon Linux 2023')] | [0]" --output text)
+
+echo "Latest available Python platform: $LATEST_PLATFORM"
+
+# Update environment to latest platform
 aws elasticbeanstalk update-environment \
   --environment-name project-pilot-env-3 \
-  --solution-stack-name "64bit Amazon Linux 2023 v4.1.1 running Python 3.11"
+  --solution-stack-name "$LATEST_PLATFORM"
 
 # Option 3: EB CLI Method (Recommended)
 # Run these commands from your project directory
