@@ -20,12 +20,14 @@ class Config:
     
     # AWS settings
     AWS_REGION = os.environ.get('AWS_REGION', 'eu-west-2')
-    SECRET_NAME = os.environ.get('SECRET_NAME', 'projectpilot/credentials')
+    SECRET_NAME = os.environ.get('SECRET_NAME', 'manager-bot-secrets')
     
     # AI API settings
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
     ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
     AWS_BEDROCK_ENABLED = os.environ.get('AWS_BEDROCK_ENABLED', 'false').lower() == 'true'
+    GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
+    S3_BUCKET_NAME = os.environ.get('S3_BUCKET_NAME', '')
     
     # Logging settings
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
@@ -45,10 +47,12 @@ class Config:
                 
                 # Update config with secrets if available
                 if secrets:
-                    cls.SECRET_KEY = secrets.get('SECRET_KEY', cls.SECRET_KEY)
+                    cls.SECRET_KEY = secrets.get('SLACK_SIGNING_SECRET', cls.SECRET_KEY)
                     cls.SQLALCHEMY_DATABASE_URI = secrets.get('DATABASE_URL', cls.SQLALCHEMY_DATABASE_URI)
                     cls.OPENAI_API_KEY = secrets.get('OPENAI_API_KEY', cls.OPENAI_API_KEY)
                     cls.ANTHROPIC_API_KEY = secrets.get('ANTHROPIC_API_KEY', cls.ANTHROPIC_API_KEY)
+                    cls.GITHUB_TOKEN = secrets.get('GITHUB_TOKEN', os.environ.get('GITHUB_TOKEN', ''))
+                    cls.S3_BUCKET_NAME = secrets.get('S3_BUCKET_NAME', os.environ.get('S3_BUCKET_NAME', ''))
                     
                     app.logger.info(f"Configuration loaded from Secrets Manager: {cls.SECRET_NAME}")
             except Exception as e:

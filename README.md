@@ -101,20 +101,25 @@ The application will be available at `http://localhost:8000`.
 
 5. Set environment variables:
    ```bash
-   eb setenv FLASK_CONFIG=production SECRET_NAME=projectpilot/credentials
+   eb setenv FLASK_CONFIG=production SECRET_NAME=manager-bot-secrets AWS_REGION=eu-west-2
    ```
 
 #### AWS Secrets Manager Setup
 
-Create a secret in AWS Secrets Manager with the following structure:
+ProjectPilot uses the existing `manager-bot-secrets` secret in AWS Secrets Manager. This secret should contain the following key-value pairs:
+
 ```json
 {
-  "SECRET_KEY": "your-secret-key-here",
+  "SLACK_SIGNING_SECRET": "used-as-application-secret-key",
   "DATABASE_URL": "postgresql://username:password@your-rds-instance.region.rds.amazonaws.com:5432/database",
   "OPENAI_API_KEY": "your-openai-api-key",
-  "ANTHROPIC_API_KEY": "your-anthropic-api-key"
+  "ANTHROPIC_API_KEY": "your-anthropic-api-key",
+  "GITHUB_TOKEN": "your-github-token",
+  "S3_BUCKET_NAME": "your-s3-bucket-name"
 }
 ```
+
+For more detailed deployment information, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Architecture
 

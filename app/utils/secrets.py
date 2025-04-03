@@ -10,7 +10,7 @@ from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 
-def get_secret(secret_name, region_name="eu-west-2"):
+def get_secret(secret_name="manager-bot-secrets", region_name="eu-west-2"):
     """
     Retrieve a secret from AWS Secrets Manager
     
