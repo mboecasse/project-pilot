@@ -58,3 +58,8 @@ secrets-manager-read-policy.json
 uploads/
 .DS_Store
 migrations/versions/
+
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
